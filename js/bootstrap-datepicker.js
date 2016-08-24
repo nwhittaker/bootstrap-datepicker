@@ -249,7 +249,7 @@
 					if (o.startDate instanceof Date)
 						o.startDate = this._local_to_utc(this._zero_time(o.startDate));
 					else
-						o.startDate = DPGlobal.parseDate(o.startDate, format, o.language, o.assumeNearbyYear);
+						o.startDate = DPGlobal.parseDate(o.startDate, format, o.language, o.assumeNearbyYear, o.autoCompute);
 				}
 				else {
 					o.startDate = -Infinity;
@@ -260,7 +260,7 @@
 					if (o.endDate instanceof Date)
 						o.endDate = this._local_to_utc(this._zero_time(o.endDate));
 					else
-						o.endDate = DPGlobal.parseDate(o.endDate, format, o.language, o.assumeNearbyYear);
+						o.endDate = DPGlobal.parseDate(o.endDate, format, o.language, o.assumeNearbyYear, o.autoCompute);
 				}
 				else {
 					o.endDate = Infinity;
@@ -594,6 +594,10 @@
 		setValue: function(){
 			var formatted = this.getFormattedDate();
 			this.inputField.val(formatted);
+      if (this.o.invalidDate && formatted === '') {
+        this._trigger('invalidDate');
+      }
+      this.o.invalidDate = false;
 			return this;
 		},
 
@@ -765,8 +769,13 @@
 			}
 
 			dates = $.map(dates, $.proxy(function(date){
-				return DPGlobal.parseDate(date, this.o.format, this.o.language, this.o.assumeNearbyYear);
+				return DPGlobal.parseDate(date, this.o.format, this.o.language, this.o.assumeNearbyYear, this.o.autoCompute);
 			}, this));
+
+      if (!dates[0]){
+        this.o.invalidDate = true;
+      }
+
 			dates = $.grep(dates, $.proxy(function(date){
 				return (
 					!this.dateWithinRange(date) ||
@@ -1666,6 +1675,7 @@
 	var defaults = $.fn.datepicker.defaults = {
 		assumeNearbyYear: false,
 		autoclose: false,
+    autoCompute: false,
 		beforeShowDay: $.noop,
 		beforeShowMonth: $.noop,
 		beforeShowYear: $.noop,
@@ -1772,7 +1782,7 @@
 			}
 			return {separators: separators, parts: parts};
 		},
-		parseDate: function(date, format, language, assumeNearby){
+		parseDate: function(date, format, language, assumeNearby, autoCompute){
 			if (!date)
 				return undefined;
 			if (date instanceof Date)
@@ -1895,6 +1905,17 @@
 							date = _date;
 					}
 				}
+        if (!autoCompute) {
+          var dateStr = (parsed.M || parsed.MM || parsed.mm || parsed.m) + "/" + (parsed.dd || parsed.d) + "/" + (parsed.yyyy || parsed.yy);
+          var t = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+          if (t !== null) {
+            var m=+t[1], y=+t[3];
+            if (date.getUTCFullYear() === y && date.getUTCMonth() === m-1) {
+              return date;
+            }
+          }
+          return null;
+        }
 			}
 			return date;
 		},
